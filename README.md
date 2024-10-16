@@ -12,8 +12,8 @@ Enhance your writing with AI-powered grammar, syntax, and spelling corrections.
 ## Usage
 
 1. Set your OpenAI API key in the plugin settings
-2. Use Ctrl+' to correct entire file
-3. Use Ctrl+Shift+' to correct selected text
+2. Use `Ctrl+'` to correct the entire file
+3. Use `Ctrl+Shift+'` to correct selected text
 
 ## Commands
 
@@ -30,7 +30,7 @@ Enhance your writing with AI-powered grammar, syntax, and spelling corrections.
 
 - **API Key**: Your OpenAI API key (required)
 - **Keyboard Layout**: Select your keyboard layout for better autocorrection
-- **Model**: Choose the OpenAI model to use for auto-correction
+- **Model**: The plugin uses OpenAI's `gpt-3.5-turbo` model for auto-correction due to its excellent balance of performance and cost-effectiveness
 
 Customize hotkeys in Obsidian's Hotkey settings.
 

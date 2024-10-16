@@ -1,213 +1,234 @@
-import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, requestUrl, Modal } from 'obsidian';
+	import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, requestUrl, Modal } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
+	// Remember to rename these classes and interfaces!
 
-interface AutoCorrectSettings {
-	apiKey: string;
-	keyboardLayout: 'QWERTY' | 'AZERTY' | 'DVORAK' | 'COLEMAK';
-	model: 'gpt-3.5-turbo'| 'gpt-4o-mini';
-}
-
-const DEFAULT_SETTINGS: AutoCorrectSettings = {
-	apiKey: '',
-	keyboardLayout: 'QWERTY',
-	model: 'gpt-3.5-turbo' // Default model
-}
-
-export default class AutoCorrectPlugin extends Plugin {
-	settings: AutoCorrectSettings;
-	statusBarItem: HTMLElement;
-
-	async onload() {
-		await this.loadSettings();
-
-		// Add status bar item
-		this.statusBarItem = this.addStatusBarItem();
-
-		// Add commands for auto-correction
-		this.addCommand({
-			id: 'auto-correct-file',
-			name: 'Auto-correct entire file',
-			hotkeys: [{ modifiers: ["Ctrl"], key: "'" }],
-			editorCallback: (editor: Editor) => this.autoCorrectText(editor, false)
-		});
-
-		this.addCommand({
-			id: 'auto-correct-selection',
-			name: 'Auto-correct selected text',
-			hotkeys: [{ modifiers: ["Ctrl", "Shift"], key: "'" }],
-			editorCallback: (editor: Editor) => this.autoCorrectText(editor, true)
-		});
-
-		// Add settings tab
-		this.addSettingTab(new AutoCorrectSettingTab(this.app, this));
+	interface AutoCorrectSettings {
+		apiKey: string;
+		keyboardLayout: 'QWERTY' | 'AZERTY' | 'DVORAK' | 'COLEMAK';
+		model: 'gpt-3.5-turbo';
 	}
 
-	async autoCorrectText(editor: Editor, selectionOnly: boolean) {
-		const text = selectionOnly ? editor.getSelection() : editor.getValue();
-		const wordCount = text.split(/\s+/).length;
+	const DEFAULT_SETTINGS: AutoCorrectSettings = {
+		apiKey: '',
+		keyboardLayout: 'QWERTY',
+		model: 'gpt-3.5-turbo'
+	}
 
-		if (!text) {
-			new Notice("No text to correct");
-			return;
+	export default class AutoCorrectPlugin extends Plugin {
+		settings: AutoCorrectSettings;
+		statusBarItem: HTMLElement;
+		private processingIndicator: ReturnType<typeof setInterval> | null = null; // Change type here
+
+		async onload() {
+			await this.loadSettings();
+
+			// Add status bar item
+			this.statusBarItem = this.addStatusBarItem();
+
+			// Add commands for auto-correction
+			this.addCommand({
+				id: 'auto-correct-file',
+				name: 'Auto-correct entire file',
+				hotkeys: [{ modifiers: ["Ctrl"], key: "'" }],
+				editorCallback: (editor: Editor) => this.autoCorrectText(editor, false)
+			});
+
+			this.addCommand({
+				id: 'auto-correct-selection',
+				name: 'Auto-correct selected text',
+				hotkeys: [{ modifiers: ["Ctrl", "Shift"], key: "'" }],
+				editorCallback: (editor: Editor) => this.autoCorrectText(editor, true)
+			});
+
+			// Add settings tab
+			this.addSettingTab(new AutoCorrectSettingTab(this.app, this));
 		}
 
-		const scope = selectionOnly ? "selection" : "file";
-		const processingMessage = `Processing ${scope} (${wordCount} words), please wait...`;
-		
-		// Show both Notice and status bar update
-		new Notice(processingMessage);
-		this.updateStatusBar(processingMessage);
+		async autoCorrectText(editor: Editor, selectionOnly: boolean) {
+			const text = selectionOnly ? editor.getSelection() : editor.getValue();
+			const wordCount = text.split(/\s+/).length;
 
-		try {
-			const { corrected, changes } = await this.callLLMForCorrection(text);
-			if (selectionOnly) {
-				editor.replaceSelection(corrected);
-			} else {
-				editor.setValue(corrected);
+			if (!text) {
+				new Notice("No text to correct");
+				return;
 			}
-			const successMessage = `${scope.charAt(0).toUpperCase() + scope.slice(1)} auto-corrected successfully!`;
-			new Notice(successMessage);
-			this.updateStatusBar(successMessage);
+
+			const scope = selectionOnly ? "selection" : "file";
+			const processingMessage = `Processing ${scope} (${wordCount} words), please wait...`;
 			
-			// Display changes in a modal
-			new ChangesModal(this.app, changes).open();
-		} catch (error) {
-			const errorMessage = "Error during auto-correction. Please check your API key and try again.";
-			new Notice(errorMessage);
-			this.updateStatusBar(errorMessage);
+			new Notice(processingMessage);
+			this.updateStatusBar(processingMessage);
+			this.startProcessingIndicator();
+
+			try {
+				const { corrected, changes } = await this.callLLMForCorrection(text);
+				if (selectionOnly) {
+					editor.replaceSelection(corrected);
+				} else {
+					editor.setValue(corrected);
+				}
+				const successMessage = `${scope.charAt(0).toUpperCase() + scope.slice(1)} auto-corrected successfully!`;
+				new Notice(successMessage);
+				this.updateStatusBar(successMessage);
+				
+				new ChangesModal(this.app, changes).open();
+			} catch (error) {
+				const errorMessage = "Error during auto-correction. Please check your API key and try again.";
+				new Notice(errorMessage);
+				this.updateStatusBar(errorMessage);
+			} finally {
+				this.stopProcessingIndicator();
+			}
 		}
-	}
 
-	updateStatusBar(message: string) {
-		this.statusBarItem.setText(message);
-		// Clear the status bar after 5 seconds
-		setTimeout(() => {
-			this.statusBarItem.setText('');
-		}, 5000);
-	}
+		updateStatusBar(message: string) {
+			this.statusBarItem.setText(message);
+			// Clear the status bar after 5 seconds
+			setTimeout(() => {
+				this.statusBarItem.setText('');
+			}, 5000);
+		}
 
-	async callLLMForCorrection(text: string): Promise<{ corrected: string, changes: string }> {
-		const apiKey = this.settings.apiKey;
-		const prompt = `Correct the grammar, syntax, and spelling for this markdown text in obsidian, keep links, and other .md syntax. Assume a ${this.settings.keyboardLayout} keyboard layout for inferring nearby keys. Do not make major changes. Return the corrected text, followed by "---CHANGES---", then a numbered list of all changes made using the format "Before" to "After" (be careful and check you are displaying a real change):
+		startProcessingIndicator() {
+			if (this.processingIndicator !== null) {
+				clearInterval(this.processingIndicator);
+			}
+			let dots = 0;
+			this.processingIndicator = setInterval(() => {
+				dots = (dots + 1) % 4;
+				this.statusBarItem.setText(`Processing${'.'.repeat(dots)}`);
+			}, 500);
+		}
+
+		stopProcessingIndicator() {
+			if (this.processingIndicator !== null) {
+				clearInterval(this.processingIndicator);
+				this.processingIndicator = null;
+				this.statusBarItem.setText('');
+			}
+		}
+
+		async callLLMForCorrection(text: string): Promise<{ corrected: string, changes: string }> {
+			const apiKey = this.settings.apiKey;
+			if (!apiKey) {
+				throw new Error('API key is missing. Please set your OpenAI API key in the plugin settings.');
+			}
+
+			const prompt = `Correct the grammar, syntax, and spelling for this markdown text in Obsidian, keeping links and other .md syntax intact. Assume a ${this.settings.keyboardLayout} keyboard layout for inferring nearby keys. Do not make major changes. Return the corrected text, followed by "---CHANGES---", then a numbered list of all changes made using the format "Before" to "After" (be careful and check you are displaying a real change):
 
 "${text}"`;
 
-		try {
-			const response = await requestUrl({
-				url: 'https://api.openai.com/v1/chat/completions',
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${apiKey}`
-				},
-				body: JSON.stringify({
-					model: this.settings.model,
-					messages: [{"role": "user", "content": prompt}],
-					temperature: 0.1
-				})
-			});
+			const maxRetries = 3;
+			for (let attempt = 1; attempt <= maxRetries; attempt++) {
+				try {
+					const response = await requestUrl({
+						url: 'https://api.openai.com/v1/chat/completions',
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': `Bearer ${apiKey}`
+						},
+						body: JSON.stringify({
+							model: this.settings.model,
+							messages: [{"role": "user", "content": prompt}],
+							temperature: 0.1
+						})
+					});
 
-			if (response.status !== 200) {
-				throw new Error(`API request failed with status ${response.status}`);
+					if (response.status !== 200) {
+						throw new Error(`API request failed with status ${response.status}: ${response.json.error.message}`);
+					}
+
+					const responseContent = response.json.choices[0].message.content;
+					const [corrected, changes] = responseContent.split('---CHANGES---');
+
+					return { corrected: corrected.trim(), changes: changes.trim() };
+				} catch (error) {
+					console.error(`Attempt ${attempt} failed:`, error);
+					if (attempt < maxRetries) {
+						// Wait before retrying
+						await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+					} else {
+						throw new Error('Error during auto-correction after multiple attempts. Please try again later.');
+					}
+				}
 			}
+			// Add a return statement here to handle the case where all attempts fail
+			return { corrected: '', changes: '' };
+		}
 
-			const responseContent = response.json.choices[0].message.content;
-			const [corrected, changes] = responseContent.split('---CHANGES---');
+		onunload() {
 
-			return { corrected: corrected.trim(), changes: changes.trim() };
-		} catch (error) {
-			console.error('Error calling OpenAI API:', error);
-			throw error;
+		}
+
+		async loadSettings() {
+			this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		}
+
+		async saveSettings() {
+			await this.saveData(this.settings);
 		}
 	}
 
-	onunload() {
+	class AutoCorrectSettingTab extends PluginSettingTab {
+		plugin: AutoCorrectPlugin;
 
-	}
+		constructor(app: App, plugin: AutoCorrectPlugin) {
+			super(app, plugin);
+			this.plugin = plugin;
+		}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
+		display(): void {
+			const {containerEl} = this;
+			containerEl.empty();
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
+			new Setting(containerEl)
+				.setName('OpenAI API Key')
+				.setDesc('Enter your OpenAI API key')
+				.addText(text => text
+						.setPlaceholder('Enter API key')
+						.setValue(this.plugin.settings.apiKey)
+						.onChange(async (value) => {
+							this.plugin.settings.apiKey = value;
+							await this.plugin.saveSettings();
+						}));
 
-class AutoCorrectSettingTab extends PluginSettingTab {
-	plugin: AutoCorrectPlugin;
-
-	constructor(app: App, plugin: AutoCorrectPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('OpenAI API Key')
-			.addText(text => text
-					.setPlaceholder('Enter API key')
-					.setValue(this.plugin.settings.apiKey)
+			new Setting(containerEl)
+				.setName('Keyboard Layout')
+				.setDesc('Select your keyboard layout for better autocorrection')
+				.addDropdown(dropdown => dropdown
+					.addOptions({
+						'QWERTY': 'QWERTY',
+						'AZERTY': 'AZERTY',
+						'DVORAK': 'DVORAK',
+						'COLEMAK': 'COLEMAK'
+					})
+					.setValue(this.plugin.settings.keyboardLayout)
 					.onChange(async (value) => {
-						this.plugin.settings.apiKey = value;
+						this.plugin.settings.keyboardLayout = value as AutoCorrectSettings['keyboardLayout'];
 						await this.plugin.saveSettings();
 					}));
-
-		new Setting(containerEl)
-			.setName('Keyboard Layout')
-			.setDesc('Select your keyboard layout for better autocorrection')
-			.addDropdown(dropdown => dropdown
-				.addOptions({
-					'QWERTY': 'QWERTY',
-					'AZERTY': 'AZERTY',
-					'DVORAK': 'DVORAK',
-					'COLEMAK': 'COLEMAK'
-				})
-				.setValue(this.plugin.settings.keyboardLayout)
-				.onChange(async (value) => {
-					this.plugin.settings.keyboardLayout = value as AutoCorrectSettings['keyboardLayout'];
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Select Model')
-			.setDesc('Choose the OpenAI model for auto-correction')
-			.addDropdown(dropdown => dropdown
-				.addOptions({
-					'gpt-3.5-turbo': 'GPT-3.5 Turbo',
-					'gpt-3.5-turbo-instruct': 'GPT-3.5 Turbo Instruct',
-					'gpt-4o-mini': 'GPT-4o Mini'
-				})
-				.setValue(this.plugin.settings.model)
-				.onChange(async (value) => {
-					this.plugin.settings.model = value as AutoCorrectSettings['model'];
-					await this.plugin.saveSettings();
-				}));
-	}
-}
-
-class ChangesModal extends Modal {
-	changes: string;
-
-	constructor(app: App, changes: string) {
-		super(app);
-		this.changes = changes;
+		}
 	}
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Changes Made:');
-		contentEl.createEl('pre', {text: this.changes});
-		
-		contentEl.createEl('p', {text: 'You can undo these changes with Ctrl+Z (Cmd+Z on Mac).'});
-	}
+	class ChangesModal extends Modal {
+		changes: string;
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+		constructor(app: App, changes: string) {
+			super(app);
+			this.changes = changes;
+		}
+
+		onOpen() {
+			const {contentEl} = this;
+			contentEl.setText('Changes Made:');
+			contentEl.createEl('pre', {text: this.changes});
+			
+			contentEl.createEl('p', {text: 'You can undo these changes with Ctrl+Z (Cmd+Z on Mac).'});
+		}
+
+		onClose() {
+			const {contentEl} = this;
+			contentEl.empty();
+		}
 	}
-}
