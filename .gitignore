@@ -5,7 +5,6 @@
 # But keep these files
 !.gitignore
 !manifest.json
-!main.ts
 !main.js
 !package.json
 !README.md
