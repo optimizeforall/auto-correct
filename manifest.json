@@ -1,6 +1,6 @@
 {
-	"id": "obsidian-auto-correct",
-	"name": "Obsidian Auto Correct",
+	"id": "auto-correct",
+	"name": "Auto Correct",
 	"version": "0.1",
 	"minAppVersion": "1.0.0",
 	"description": "Auto corrects your markdown files using OpenAI's GPT-3.5 and GPT-4o Mini.",
