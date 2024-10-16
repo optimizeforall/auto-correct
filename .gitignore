@@ -6,5 +6,6 @@
 !.gitignore
 !manifest.json
 !main.js
+!main.ts
 !package.json
 !README.md
