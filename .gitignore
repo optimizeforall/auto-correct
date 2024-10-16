@@ -1,0 +1,10 @@
+# Remove everything but essentials to install obsidian plugin
+# Ignore everything
+*
+
+# But keep these files
+!.gitignore
+!manifest.json
+!main.ts
+!package.json
+!README.md
