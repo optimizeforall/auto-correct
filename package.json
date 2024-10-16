@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-auto-correct",
+	"name": "auto-correct",
 	"version": "0.1",
 	"description": "Auto corrects your markdown files using OpenAI's GPT-3.5.",
 	"main": "main.js",
