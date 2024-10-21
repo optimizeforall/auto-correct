@@ -4,8 +4,8 @@
 	"description": "Auto corrects your markdown files using OpenAI's GPT-3.5.",
 	"main": "main.js",
 	"scripts": {
-		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"dev": "node esbuild.config.js",
+		"build": "rollup --config rollup.config.js",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [

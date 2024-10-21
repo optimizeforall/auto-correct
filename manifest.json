@@ -1,11 +1,18 @@
 {
+<<<<<<< HEAD
 	"id": "auto-correct",
 	"name": "Auto Correct",
 	"version": "0.1",
 	"minAppVersion": "1.0.0",
 	"description": "Auto corrects your markdown files using OpenAI's GPT-3.5 and GPT-4o Mini.",
+=======
+	"id": "autocorrect-plugin",
+	"name": "AutoCorrect Plugin",
+	"version": "0.1.1",
+	"minAppVersion": "0.15.0",
+	"description": "An Obsidian plugin for auto-correcting text using OpenAI's API.",
+>>>>>>> b2761fc (update prompt to exclude ```markdown)
 	"author": "optimizeforall",
 	"authorUrl": "https://github.com/optimizeforall",
-	"fundingUrl": "https://github.com/optimizeforall",
 	"isDesktopOnly": false
 }

@@ -29,14 +29,14 @@
 			this.addCommand({
 				id: 'auto-correct-file',
 				name: 'Auto-correct entire file',
-				hotkeys: [{ modifiers: ["Ctrl"], key: "'" }],
+				hotkeys: [{ modifiers: ["Ctrl"], key: "'" }], // Default hotkey
 				editorCallback: (editor: Editor) => this.autoCorrectText(editor, false)
 			});
 
 			this.addCommand({
 				id: 'auto-correct-selection',
 				name: 'Auto-correct selected text',
-				hotkeys: [{ modifiers: ["Ctrl", "Shift"], key: "'" }],
+				hotkeys: [{ modifiers: ["Ctrl", "Shift"], key: "'" }], // Default hotkey
 				editorCallback: (editor: Editor) => this.autoCorrectText(editor, true)
 			});
 
@@ -114,7 +114,7 @@
 				throw new Error('API key is missing. Please set your OpenAI API key in the plugin settings.');
 			}
 
-			const prompt = `Correct the grammar, syntax, and spelling for this markdown text in Obsidian, keeping links and other .md syntax intact. Assume a ${this.settings.keyboardLayout} keyboard layout for inferring nearby keys. Do not make major changes. Return the corrected text, followed by "---CHANGES---", then a numbered list of all changes made using the format "Before" to "After" (be careful and check you are displaying a real change):
+			const prompt = `Correct the grammar, syntax, and spelling for this markdown text in Obsidian, keeping links and other .md syntax intact. Assume a ${this.settings.keyboardLayout} keyboard layout for inferring nearby keys. Do not make major changes. Return the corrected text as plain markdown without any code block formatting, followed by "---CHANGES---", then a numbered list of all changes made using the format "Before" to "After" (be careful and check you are displaying a real change):
 
 "${text}"`;
 
