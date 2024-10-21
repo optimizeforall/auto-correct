@@ -5,7 +5,7 @@
 # But keep these files
 !.gitignore
 !manifest.json
-!main.js
+# !main.js don't include build files
 !main.ts
 !package.json
 !README.md

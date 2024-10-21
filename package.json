@@ -18,6 +18,10 @@
 	"author": "optimizeforall",
 	"license": "MIT",
 	"devDependencies": {
+		"@rollup/plugin-commonjs": "^28.0.1",
+		"@rollup/plugin-node-resolve": "^15.3.0",
+
+		"@rollup/plugin-typescript": "^12.1.1",
 		"@types/node": "^20.11.24",
 		"@typescript-eslint/eslint-plugin": "^6.21.0",
 		"@typescript-eslint/parser": "^6.21.0",
