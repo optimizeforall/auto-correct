@@ -1,7 +1,7 @@
 {
-	"id": "autocorrect-plugin",
+	"id": "auto-correct",
 	"name": "AutoCorrect Plugin",
-	"version": "0.1.1",
+	"version": "0.1",
 	"minAppVersion": "0.15.0",
 	"description": "An Obsidian plugin for auto-correcting text using OpenAI's API.",
 	"author": "optimizeforall",
